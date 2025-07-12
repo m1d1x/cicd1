@@ -63,12 +63,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no \
             -i ssh_key \
             -p ${{ secrets.SSH_PORT }} \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            cd ${{ secrets.TARGET_PATH }}
-            gzip -d my-svelte-app.tar.gz
-            docker load < my-svelte-app.tar
-            docker stop my-svelte-app || true
-            docker rm my-svelte-app   || true
-            docker run -d --name my-svelte-app -p 80:80 my-svelte-app:latest
-            rm my-svelte-app.tar
-            EOF
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ${{ secrets.TARGET_PATH }} && \
+             gzip -d my-svelte-app.tar.gz && \
+             docker load < my-svelte-app.tar && \
+             docker stop my-svelte-app || true && \
+             docker rm my-svelte-app   || true && \
+             docker run -d --name my-svelte-app -p 80:80 my-svelte-app:latest && \
+             rm my-svelte-app.tar"
