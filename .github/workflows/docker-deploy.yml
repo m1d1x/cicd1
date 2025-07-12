@@ -1,6 +1,5 @@
 name: CI/CD Docker Deploy
 
-# Запускать на пуш в ветку main или вручную
 on:
   push:
     branches: [main]
@@ -9,38 +8,71 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      # 1. Клонируем код
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # Сборка и упаковка образа (ваш код) …
+      # 2. Настраиваем Buildx (опционально)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
+      # 3. Строим Docker-образ
+      - name: Build Docker image
+        run: |
+          docker build -t my-svelte-app:latest .
+
+      # 4. Упаковываем образ в архив
+      - name: Save Docker image to tar.gz
+        run: |
+          docker save my-svelte-app:latest | gzip > my-svelte-app.tar.gz
+
+      # 5. Подготавливаем SSH-ключ для scp/ssh
       - name: Setup SSH key
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ./ssh_key
-          chmod 600 ./ssh_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key
+          chmod 600 ssh_key
 
-      - name: Copy image archive to VPS
-        uses: appleboy/scp-action@v0.1.5
+      # 5a. Убедиться, что папка на VPS существует
+      - name: Ensure TARGET_PATH exists on VPS
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
-          key_path: ./ssh_key
-          source: 'my-svelte-app.tar.gz'
-          target: '${{ secrets.TARGET_PATH }}'
+          key_path: ssh_key
+          script: |
+            mkdir -p ${{ secrets.TARGET_PATH }}
+            chown ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} ${{ secrets.TARGET_PATH }}
 
+      # 6. Копируем архив на VPS
+      - name: Copy image archive to VPS
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }} # если 22 — можно убрать
+          username: ${{ secrets.SSH_USER }}
+          key_path: ssh_key
+          source: my-svelte-app.tar.gz
+          target: ${{ secrets.TARGET_PATH }}
+
+      # 7. На VPS загружаем образ и перезапускаем контейнер
       - name: Load image and restart container on VPS
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
-          key_path: ./ssh_key
+          key_path: ssh_key
           script: |
             cd ${{ secrets.TARGET_PATH }}
             gzip -d my-svelte-app.tar.gz
             docker load < my-svelte-app.tar
             docker stop my-svelte-app || true
             docker rm my-svelte-app   || true
-            docker run -d --name my-svelte-app -p 80:80 my-svelte-app:latest
+            docker run -d \
+              --name my-svelte-app \
+              -p 80:80 \
+              my-svelte-app:latest
             rm my-svelte-app.tar
