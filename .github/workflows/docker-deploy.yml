@@ -34,7 +34,16 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key
           chmod 600 ssh_key
 
-      # 5a. Убедиться, что папка на VPS существует
+      # 5a. Тестируем SSH-подключение
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -i ssh_key \
+              -p ${{ secrets.SSH_PORT }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+              "echo SSH connection successful"
+
+      # 5b. Убедиться, что папка на VPS существует
       - name: Ensure TARGET_PATH exists on VPS
         uses: appleboy/ssh-action@v0.1.7
         with:
