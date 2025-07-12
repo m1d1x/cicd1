@@ -1,11 +1,5 @@
 test222
 
-ssh -i ~/.ssh/github_actions \
- -o StrictHostKeyChecking=no \
- -p 22 \
- root@147.45.185.193 \
- "echo SSH OK"
-
 # Svelte + TS + Vite
 
 This template should help get you started developing with Svelte and TypeScript in Vite.
